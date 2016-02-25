@@ -4,16 +4,20 @@ Created on Feb 20, 2016
 @author: dulupinar
 '''
 from collections import defaultdict,Counter
+from scipy import stats
 import operator
 import random
 import numpy as np
 import logging
+import math
+import matplotlib.pyplot as plt
+from matplotlib.mlab import dist
 logging.basicConfig(level=logging.CRITICAL,format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
 
 
 ALPHA = ["A","C","T","G"]
 LEN_ALPHA = len(ALPHA)
-
+    
 def generateSequences(genome_length,kmer_length,num_sequneces,mismatches,rand_seed=1):
     #check that genome_length is greater than kmer_length
     random.seed(rand_seed)
@@ -59,6 +63,18 @@ class SequenceKmerList():
     def getAllKmers(self):
         return [sequence_kmer[1] for sequence_kmer in self.sequences_kmer]
 
+def safeLog(number):
+    return (math.log(number,2) if number >0 else 0)
+
+def calculateEntropy(profile):
+    entropy = 0
+    entropy_matrix = np.copy(profile.transpose()) #entropy matrix is now 
+    for positions in entropy_matrix:
+        pos = map(lambda x: x/float(sum(positions)), positions)
+        entropy+=sum(map(lambda b: b*safeLog(b),pos))
+    
+    return entropy*-1
+
 def calculateScore(kmers):
     #calculates the score given a list of kmers
     #calucluate a column for each
@@ -79,19 +95,45 @@ def calculateScore(kmers):
     consensus = "".join([col.most_common(1)[0][0] for col in columns])
     return score,consensus
     
-
-def gibbs(sequences,kmer_length,rand_seed=1):
-    random.seed(rand_seed)
-    sequence_kmers = SequenceKmerList(sequences,kmer_length)  
+def minHammingDistance(dna,kmer):
+    min_distance = float("Inf")
+    start_pos = 0
+    for start_pos in len(range(dna)-kmer +1):
+        dist = 0
+        for base_index in range(len(kmer)):
+            if dna[base_index] != kmer[base_index]:
+                dist+=1
+        if dist < min_distance:
+            min_distance = dist
+            min_pos = start_pos
     
+    return dna[start_pos:start_pos+len(kmer)]
+
+def getSlope(scores):
+    slope = 0
+    r_value = 0
+    if len(scores) > 5:
+        x,y = zip(*scores[-5:])
+        slope, intercept, r_value, p_value, std_err = stats.linregress(x,y)
+    return abs(slope),abs(r_value)
+
+def selectInitalKmers(sequences,kmer_length,rand_seed=None,prior=None):
+    random.seed(rand_seed)
+    sequence_kmers = SequenceKmerList(sequences,kmer_length) 
     logging.debug("Selecting initial random kmers for each sequence")
-    for i in range(len(sequences)):        
+    for i in range(len(sequence_kmers)):        
         sequence = sequence_kmers[i][0]
         start_pos = random.randint(0,len(sequence) - kmer_length)
         end_pos = start_pos+ kmer_length
-        kmer = sequence[start_pos: end_pos]
-        sequence_kmers[i][1] = kmer
+ 
+        sequence_kmers[i][1] = sequence[start_pos: end_pos] if prior is None else gibbsSampler(prior,sequence,prob_deterministic=1,most_probable=False)
         
+    return sequence_kmers
+        
+def gibbs(sequence_kmers,determinstic=False):
+    
+    scores = []
+    tryyy = []
     score = float('Inf')
     tries = 0
     max_tries = 10000
@@ -103,51 +145,72 @@ def gibbs(sequences,kmer_length,rand_seed=1):
         if tries % (max_tries/15) == 0: 
             logging.debug("Score is " + str(score) + " on try " + str(tries))
         
-        gibbsSampler(sequence_kmers)
+        kmer_list,exclude_index = sequence_kmers.getAllButOneKmers()
+        excluded_sequence = sequence_kmers[exclude_index][0] 
+        profile = generateProfile(kmer_list)
+        
+        #calculate the probability of slope
+        slope, rvalue = getSlope(scores)
+        probability_deterministic = slope if determinstic and rvalue >.8 else 0
+        selected_kmer = gibbsSampler(profile,excluded_sequence,prob_deterministic=probability_deterministic)
+        
+        
+        sequence_kmers[exclude_index][1] = selected_kmer
         score,consensus = calculateScore(sequence_kmers.getAllKmers())
         
+        logging.debug("the slope is + " + str(getSlope(scores)))
         if score < min_score:
+            entropy = calculateEntropy(generateProfile(sequence_kmers.getAllKmers()))
+            
+            
             score_change = 0
             min_score = score
             min_consensus = consensus
             logging.debug("found min score {0} and consensus {1} on try {2}".format(min_score,min_consensus,tries))
         else:
             score_change +=1    
-
-    logging.warn("The max tries is {0} and changless is {1}".format(tries,score_change))
-    return min_consensus,min_score
-        
-def gibbsSampler(sequence_kmer_list):
+            
+        if score != float('Inf'):scores.append((tries,entropy))
     
-    kmer_list,exclude_index = sequence_kmer_list.getAllButOneKmers()
-    profile = generateProfile(kmer_list) 
-    excluded_sequence = sequence_kmer_list[exclude_index][0]   
+    logging.warn("The max tries is {0} and changless is {1}".format(tries,score_change))
+    
+    return min_consensus,min_score,zip(*scores),profile
+        
+
+def gibbsSampler(profile,excluded_sequence,prob_deterministic=0,most_probable=True):
+    
+    kmer_length = len(profile[0]) 
     #select kmer
     kmer_selection = dict()
     sum_prob = 0
-    for i in range(len(excluded_sequence) - sequence_kmer_list.kmer_length +1):
-        possible_kmer = excluded_sequence[i:i+sequence_kmer_list.kmer_length]
+    for i in range(len(excluded_sequence) - kmer_length +1):
+        possible_kmer = excluded_sequence[i:i+kmer_length]
         #generate probability for kmer
         probability = 1
         for index,base in enumerate(possible_kmer):
             probability = probability*profile[ALPHA.index(base),index]
         kmer_selection[possible_kmer] = probability
         sum_prob+=probability
-    #roll the dice need to roll
-    prev = 0
-    for key in kmer_selection:
-        kmer_selection[key] =  kmer_selection[key]/sum_prob + prev
-        prev = kmer_selection[key]
-        
-    dice_roll = random.uniform(0,1)
-    for value in sorted(kmer_selection.items(), key=operator.itemgetter(1)):
-        if value[1] > dice_roll:
-            break
-    selected_kmer = value[0]
     
-    sequence_kmer_list[exclude_index][1] = selected_kmer
+    #coin flip for greedy over deterministic
+    dice_roll = random.uniform(0,1) #also a coin flip
+    if prob_deterministic > dice_roll:   
+        #calculate greedy
+        logging.debug("chose the greedy" + str(prob_deterministic))
+        selected_kmer = max(kmer_selection.iteritems(), key=operator.itemgetter(1))[0] if most_probable else min(kmer_selection.iteritems(), key=operator.itemgetter(1))[0] 
+    else:
+        #calculate gibbs
+        prev = 0
+        for key in kmer_selection:
+            kmer_selection[key] =  kmer_selection[key]/sum_prob + prev
+            prev = kmer_selection[key]
+            
+        for value in sorted(kmer_selection.items(), key=operator.itemgetter(1)):
+            if value[1] > dice_roll:
+                break
+        selected_kmer = value[0]
     
-    return sequence_kmer_list
+    return selected_kmer
 
 def generateProfile(kmers):  
     #select the kme
@@ -164,34 +227,83 @@ def generateProfile(kmers):
     return profile
  
 def runRegularGibbs():           
-    seqs,kmer = generateSequences(25, 5, 10, 1)
+    seqs,kmer = generateSequences(200, 15, 20, 0)
     print "THE ORIGINAL SEQUENCES"
     print str("\n".join(seqs))
     print "THE ORIGINAL KMER"
     print kmer
  
     found_kmer = defaultdict(list)
-    for i in range(100):
-        km = gibbs(seqs, len(kmer),rand_seed =None )
+    lines = []
+    for _ in range(1000):
+        km = gibbs(seqs, len(kmer),.5,rand_seed =None )
         found_kmer[km[1]].append(km[0])
+        lines.append(km[2])
+    
+    for line in lines:
+        plt.plot(*line,color='b')
+     
+    #calculate stdev at each point
         
+    lines = []   
+    for _ in range(1000):
+        km = gibbs(seqs, len(kmer),0,rand_seed =None )
+        found_kmer[km[1]].append(km[0])
+        lines.append(km[2])
+    
+    for line in lines:
+        plt.plot(*line,color='y')
+    
+    plt.show()  
+    ks = min(found_kmer.keys())
+    print ks,found_kmer[ks]
+    print calculateScore(found_kmer[ks])
+    
+def runRegularPriorGibbs():           
+    seqs,kmer = generateSequences(100, 15, 20, 3)
+    print "THE ORIGINAL SEQUENCES"
+    print str("\n".join(seqs))
+    print "THE ORIGINAL KMER"
+    print kmer
+ 
+    found_kmer = defaultdict(list)
+    lines = []
+    
+    sequence_kmers = selectInitalKmers(seqs, len(kmer))
+    
+    for _ in range(40):
+        km = gibbs(sequence_kmers,determinstic=False )
+        sequence_kmers = selectInitalKmers(seqs, len(kmer),prior = km[3])
+        found_kmer[km[1]].append(km[0])
+        lines.append(km[2])
+        
+    for line in lines:
+        plt.plot(*line,color='b')
+      
+    #print "The number of times we hit 0",len(found_kmer[0])
+    ks = min(found_kmer.keys())  
+    print ks,found_kmer[ks]
+    print calculateScore(found_kmer[ks])
+    found_kmer = defaultdict(list)
+    
+    lines = []   
+    for _ in range(40):
+        sequence_kmers = selectInitalKmers(seqs, len(kmer))
+        km = gibbs(sequence_kmers,determinstic=False )
+        found_kmer[km[1]].append(km[0])
+        lines.append(km[2])
+    
+    for line in lines:
+        plt.plot(*line,color='y')
+    
+    #plt.show()
+    
+    #print "The number of times we hit 0",len(found_kmer[0])
+    #calculate stdev at each point
     ks = min(found_kmer.keys())
     print ks,found_kmer[ks]
     print calculateScore(found_kmer[ks])
        
 if __name__ == "__main__":
+    runRegularPriorGibbs()
     
-    seqs,kmer = generateSequences(35, 15, 10, 3)
-    print "THE ORIGINAL SEQUENCES"
-    print str("\n".join(seqs))
-    print "THE ORIGINAL KMER"
-    print kmer
- 
-    found_kmer = defaultdict(list)
-    for i in range(100):
-        km = gibbs(seqs, len(kmer),rand_seed =None )
-        found_kmer[km[1]].append(km[0])
-        
-    ks = min(found_kmer.keys())
-    print ks,found_kmer[ks]
-    print calculateScore(found_kmer[ks])
