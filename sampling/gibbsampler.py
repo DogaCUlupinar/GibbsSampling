@@ -137,7 +137,7 @@ def gibbs(sequence_kmers,determinstic=False):
     score = float('Inf')
     tries = 0
     max_tries = 10000
-    max_changless = 100 # number of tries we want to do without score changing
+    max_changless = 25 # number of tries we want to do without score changing
     score_change = 0 #number of times where the score hasn't changed
     min_score = float('Inf')
     while score > 1 and tries < max_tries and score_change<max_changless:
@@ -225,85 +225,4 @@ def generateProfile(kmers):
         cell[...] = cell +1
         
     return profile
- 
-def runRegularGibbs():           
-    seqs,kmer = generateSequences(200, 15, 20, 0)
-    print "THE ORIGINAL SEQUENCES"
-    print str("\n".join(seqs))
-    print "THE ORIGINAL KMER"
-    print kmer
- 
-    found_kmer = defaultdict(list)
-    lines = []
-    for _ in range(1000):
-        km = gibbs(seqs, len(kmer),.5,rand_seed =None )
-        found_kmer[km[1]].append(km[0])
-        lines.append(km[2])
-    
-    for line in lines:
-        plt.plot(*line,color='b')
-     
-    #calculate stdev at each point
-        
-    lines = []   
-    for _ in range(1000):
-        km = gibbs(seqs, len(kmer),0,rand_seed =None )
-        found_kmer[km[1]].append(km[0])
-        lines.append(km[2])
-    
-    for line in lines:
-        plt.plot(*line,color='y')
-    
-    plt.show()  
-    ks = min(found_kmer.keys())
-    print ks,found_kmer[ks]
-    print calculateScore(found_kmer[ks])
-    
-def runRegularPriorGibbs():           
-    seqs,kmer = generateSequences(100, 15, 20, 3)
-    print "THE ORIGINAL SEQUENCES"
-    print str("\n".join(seqs))
-    print "THE ORIGINAL KMER"
-    print kmer
- 
-    found_kmer = defaultdict(list)
-    lines = []
-    
-    sequence_kmers = selectInitalKmers(seqs, len(kmer))
-    
-    for _ in range(40):
-        km = gibbs(sequence_kmers,determinstic=False )
-        sequence_kmers = selectInitalKmers(seqs, len(kmer),prior = km[3])
-        found_kmer[km[1]].append(km[0])
-        lines.append(km[2])
-        
-    for line in lines:
-        plt.plot(*line,color='b')
-      
-    #print "The number of times we hit 0",len(found_kmer[0])
-    ks = min(found_kmer.keys())  
-    print ks,found_kmer[ks]
-    print calculateScore(found_kmer[ks])
-    found_kmer = defaultdict(list)
-    
-    lines = []   
-    for _ in range(40):
-        sequence_kmers = selectInitalKmers(seqs, len(kmer))
-        km = gibbs(sequence_kmers,determinstic=False )
-        found_kmer[km[1]].append(km[0])
-        lines.append(km[2])
-    
-    for line in lines:
-        plt.plot(*line,color='y')
-    
-    #plt.show()
-    
-    #print "The number of times we hit 0",len(found_kmer[0])
-    #calculate stdev at each point
-    ks = min(found_kmer.keys())
-    print ks,found_kmer[ks]
-    print calculateScore(found_kmer[ks])
-       
-if __name__ == "__main__":
-    runRegularPriorGibbs()
     

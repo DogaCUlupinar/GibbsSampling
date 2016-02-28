@@ -27,7 +27,7 @@ def makeMotifScoreCountGraph(seqs,kmer_len,ax,configurations,iterations):
         if i % max(1,(iterations/10)) == 0: print "{0:.0f}% is done".format(float(i)/iterations*100)
         consensus_string,score,data,profile = gibbs(sequence_kmers,determinstic=configurations[CONFIG_GREEDY] )
         prior_profile = profile if configurations[CONFIG_PRIOR] else None
-        sequence_kmers = selectInitalKmers(seqs, len(kmer),prior = prior_profile)
+        sequence_kmers = selectInitalKmers(seqs, kmer_len,prior = prior_profile)
         count[score]+=1
         found_kmer[score].append(consensus_string)
         
@@ -43,13 +43,13 @@ def makeSTDevGraph(seqs,kmer_len,ax,configurations,iterations):
     count= Counter()
     lines = []
     
-    sequence_kmers = selectInitalKmers(seqs, len(kmer))
+    sequence_kmers = selectInitalKmers(seqs, kmer_len)
     
     for i in range(iterations):
         if i % max(1,(iterations/10)) == 0: print "{0:.0f}% is done".format(float(i)/iterations*100)
         consensus_string,score,data,profile = gibbs(sequence_kmers,determinstic=configurations[CONFIG_GREEDY] )
         prior_profile = profile if configurations[CONFIG_PRIOR] else None
-        sequence_kmers = selectInitalKmers(seqs, len(kmer),prior = prior_profile)
+        sequence_kmers = selectInitalKmers(seqs, kmer_len,prior = prior_profile)
         count[score]+=1
         found_kmer[score].append(consensus_string)
         lines.append(data)
@@ -81,8 +81,8 @@ def makeSTDevGraph(seqs,kmer_len,ax,configurations,iterations):
     print ks,found_kmer[ks]
     print calculateScore(found_kmer[ks])
     return calculateScore(found_kmer[ks])
-        
-if __name__ == "__main__":
+
+def makeGraphs():
     fig,ax=plt.subplots()
     seqs,kmer = generateSequences(250, 15, 10, 3)
     print "THE ORIGINAL SEQUENCES"
@@ -90,12 +90,19 @@ if __name__ == "__main__":
     print "THE ORIGINAL KMER"
     print kmer
     
-    iter = 500
+    iter = 1000
+    """
     for config in configurations:
         print makeMotifScoreCountGraph(seqs,len(kmer),ax,config,iter)
+    """ 
+    
+    for config in configurations:
+        print makeSTDevGraph(seqs,len(kmer),ax,config,iter)
     
     
     ax.legend(loc='upper right')
     plt.xlabel('Iterations')
     plt.ylabel('Motif Entropy')
-    plt.show()
+    plt.show()     
+if __name__ == "__main__":
+    
