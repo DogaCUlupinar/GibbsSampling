@@ -48,7 +48,7 @@ def makeNumIterations(seqs,kmer_len,ax,configurations,passes,original_kmer):
     
     total_iterations = []
     for pass_c in range(passes):
-        if pass_c % max(1,(passes/10)) == 0: logging.warn("{0:.0f}% is done".format(float(pass_c)/passes*100))
+        if pass_c % max(1,(passes/10)) == 0: logging.critical("{0:.0f}% is done".format(float(pass_c)/passes*100))
         
         for i in range(max_iterations):  
             consensus_string,score,data,profile = gibbs(sequence_kmers,determinstic=configurations[CONFIG_GREEDY] )
@@ -113,11 +113,10 @@ def makeSTDevGraph(seqs,kmer_len,ax,configurations,iterations):
     ks = min(found_kmer.keys())
     print configurations[CONFIG_LABEL]
     print "Average iteration is {0}, with sdt {1}".format(str(sum(iter_to_conv)/float(len(iter_to_conv))),str(np.std(np.asarray(iter_to_conv))))
-    return ks,found_kmer[ks]
+    return ks,found_kmer[ks][0]
 
 def makeSTDGraphs(mismatch,iter):
     fig,ax=plt.subplots()
-    mismatch = 0
     seqs,kmer = generateSequences(250, 15, 10,mismatch)
     print "THE ORIGINAL SEQUENCES"
     print str("\n".join(seqs))
@@ -155,4 +154,4 @@ def makeIterGraphs(mismatch,iter):
     plt.show()
     
 if __name__ == "__main__":
-    makeIterGraphs(3,1000)
+    makeIterGraphs(1,10)
