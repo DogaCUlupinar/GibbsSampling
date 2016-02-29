@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.CRITICAL,format='%(asctime)s %(message)s', dat
 ALPHA = ["A","C","T","G"]
 LEN_ALPHA = len(ALPHA)
     
-def generateSequences(genome_length,kmer_length,num_sequneces,mismatches,rand_seed=1):
+def generateSequences(genome_length,kmer_length,num_sequneces,mismatches,rand_seed=15):
     #check that genome_length is greater than kmer_length
     random.seed(rand_seed)
     kmer_no_mismatch = [ALPHA[random.randint(0,LEN_ALPHA-1)] for i in range(kmer_length)]
@@ -28,7 +28,7 @@ def generateSequences(genome_length,kmer_length,num_sequneces,mismatches,rand_se
         genome = [ALPHA[random.randint(0,LEN_ALPHA-1)] for i in range(genome_length-kmer_length)]
         kmer = list(kmer_no_mismatch)
         #generate the mismatches
-        for _ in range(random.randint(0,mismatches)):
+        for _ in range(mismatches):
             # up to mismatches
             rand_pos_kmer = random.randint(0,kmer_length-1) #random position in kmer
             kmer[rand_pos_kmer] = ALPHA[(ALPHA.index(kmer[rand_pos_kmer])+1)%4]
@@ -174,7 +174,7 @@ def gibbs(sequence_kmers,determinstic=False):
     
     logging.warn("The max tries is {0} and changless is {1}".format(tries,score_change))
     
-    return min_consensus,min_score,zip(*scores),profile
+    return min_consensus,entropy,zip(*scores),profile
         
 
 def gibbsSampler(profile,excluded_sequence,prob_deterministic=0,most_probable=True):
