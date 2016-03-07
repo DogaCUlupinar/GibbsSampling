@@ -12,10 +12,10 @@ CONFIG_LABEL  = "LABEL"
 CONFIG_PRIOR  = "PRIOR"
 CONFIG_GREEDY = "GREEDY"
 CONFIG_COLOR  = "COLOR"
-configurations = [{CONFIG_LABEL:'Standard Gibbs', CONFIG_GREEDY:False,CONFIG_PRIOR:False, CONFIG_COLOR:'b' },\
+configurations = [{CONFIG_LABEL:'Naive Gibbs', CONFIG_GREEDY:False,CONFIG_PRIOR:False, CONFIG_COLOR:'b' },\
                    {CONFIG_LABEL:'Prior Knowledge', CONFIG_GREEDY:False,CONFIG_PRIOR:True,CONFIG_COLOR:'r' },\
-                   {CONFIG_LABEL:'Greedy', CONFIG_GREEDY:True,CONFIG_PRIOR:False,CONFIG_COLOR:'g'},\
-                   {CONFIG_LABEL:'Prior Knowledge and Greedy', CONFIG_GREEDY:True,CONFIG_PRIOR:False, CONFIG_COLOR:'k' }]
+                   {CONFIG_LABEL:'Psuedo Greedy', CONFIG_GREEDY:True,CONFIG_PRIOR:False,CONFIG_COLOR:'g'},\
+                   {CONFIG_LABEL:'Prior Knowledge and Greedy', CONFIG_GREEDY:True,CONFIG_PRIOR:True, CONFIG_COLOR:'k' }]
     
 def makeMotifScoreCountGraph(seqs,kmer_len,ax,configurations,iterations):           
 
@@ -154,4 +154,4 @@ def makeIterGraphs(mismatch,iter):
     plt.show()
     
 if __name__ == "__main__":
-    makeIterGraphs(1,10)
+    makeSTDGraphs(3,1000)
